@@ -267,27 +267,41 @@ ATURAN PENTING:
 Balas HANYA dengan JSON array murni, tanpa teks lain, tanpa markdown, tanpa backtick:
 [{"nama":"Nama Resep","emoji":"emoji","warna":"#hexcolor","waktu":"X menit","tekstur":"jenis tekstur","nutrisi":"emoji + manfaat gizi singkat","bahan":["bahan 1 + takaran","bahan 2 + takaran"],"langkah":["langkah 1","langkah 2","langkah 3","langkah 4"],"tips":"1 tips spesifik resep ini"}]`;
     try{
-      const res=await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
-        {
-          method:"POST",
-          headers:{"Content-Type":"application/json"},
-          body:JSON.stringify({
-            contents:[{parts:[{text:prompt}]}],
-            generationConfig:{temperature:0.7,maxOutputTokens:2048},
-          }),
-        }
-      );
-      const data=await res.json();
-      if(data.error){setApiError("Error Gemini API: "+data.error.message);setLoading(false);return;}
-      const text=data.candidates?.[0]?.content?.parts?.[0]?.text||"[]";
-      const clean=text.replace(/```json|```/g,"").trim();
-      setResults(JSON.parse(clean));
-    }catch(e){
-      setApiError("Gagal terhubung ke AI. Periksa API key dan koneksi internet.");
-    }
-    setLoading(false);
-  };
+const res = await fetch('/api/gemini', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({ 
+    ageMonths: babyAge,  // Kirim parameter yang diperlukan
+    dietaryRestrictions: alergi.length > 0 ? `Hindari alergen: ${alergi.join(', ')}` : ''
+  })
+});
+      const data = await res.json();
+
+// Cek error dari API route server-side
+if (!res.ok) {
+  setApiError(`Error: ${data.error || 'Gagal terhubung ke server'}`);
+  setLoading(false);
+  return;
+}
+
+if (!data.success || !data.data) {
+  setApiError('Respon tidak valid dari server');
+  setLoading(false);
+  return;
+}
+
+// Hasil resep sudah berupa object JSON langsung dari server
+const result = data.data;
+
+try {
+  // Wrap dalam array sesuai struktur expect komponen Anda
+  setResults([result]);
+} catch (e) {
+  console.error('Parse error:', e);
+  setApiError('Format data hasil tidak valid');
+}
+
+setLoading(false);
 
   const handleAddJadwal=async(hari,waktu)=>{
     onAddJadwal(hari,waktu,activeResep.nama);
