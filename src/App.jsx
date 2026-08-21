@@ -266,42 +266,37 @@ ATURAN PENTING:
 
 Balas HANYA dengan JSON array murni, tanpa teks lain, tanpa markdown, tanpa backtick:
 [{"nama":"Nama Resep","emoji":"emoji","warna":"#hexcolor","waktu":"X menit","tekstur":"jenis tekstur","nutrisi":"emoji + manfaat gizi singkat","bahan":["bahan 1 + takaran","bahan 2 + takaran"],"langkah":["langkah 1","langkah 2","langkah 3","langkah 4"],"tips":"1 tips spesifik resep ini"}]`;
-    try{
-const res = await fetch('/api/gemini', {
-  method: 'POST',
-  headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify({ 
-    ageMonths: babyAge,  // Kirim parameter yang diperlukan
-    dietaryRestrictions: alergi.length > 0 ? `Hindari alergen: ${alergi.join(', ')}` : ''
-  })
-});
-      const data = await res.json();
+    
+    const generate=async()=>{
+  if(!bahanDipilih.length) return;
+  setLoading(true); setView("hasil"); setResults([]); setApiError("");
 
-// Cek error dari API route server-side
-if (!res.ok) {
-  setApiError(`Error: ${data.error || 'Gagal terhubung ke server'}`);
-  setLoading(false);
-  return;
-}
+  try{
+    const res = await fetch('/api/gemini', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ 
+        ageMonths: babyAge,
+        dietaryRestrictions: alergi.length > 0 ? `Hindari alergen: ${alergi.join(', ')}` : ''
+      })
+    });
 
-if (!data.success || !data.data) {
-  setApiError('Respon tidak valid dari server');
-  setLoading(false);
-  return;
-}
+    const data = await res.json();
 
-// Hasil resep sudah berupa object JSON langsung dari server
-const result = data.data;
+    if(!res.ok || !data.success || !data.data){
+      setApiError(data.error || 'Gagal terhubung ke server');
+      setLoading(false);
+      return;
+    }
 
-try {
-  // Wrap dalam array sesuai struktur expect komponen Anda
-  setResults([result]);
-} catch (e) {
-  console.error('Parse error:', e);
-  setApiError('Format data hasil tidak valid');
-}
-
-setLoading(false);
+    setResults([data.data]);
+  }catch(e){
+    console.error('Generate error:', e);
+    setApiError("Gagal terhubung ke server. Coba lagi.");
+  }finally{
+    setLoading(false);
+  }
+};
 
   const handleAddJadwal=async(hari,waktu)=>{
     onAddJadwal(hari,waktu,activeResep.nama);
