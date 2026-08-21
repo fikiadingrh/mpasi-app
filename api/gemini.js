@@ -3,21 +3,19 @@ export async function POST(req) {
   try {
     const { ageMonths, dietaryRestrictions } = await req.json();
     
-    // Ambil API key dari environment variable (server-side)
     const apiKey = process.env.GEMINI_API_KEY;
     
     if (!apiKey) {
       return new Response(
         JSON.stringify({ 
-          error: 'GEMINI_API_KEY belum dikonfigurasi di Vercel',
-          message: 'Hubungi admin untuk setup API key'
+          error: 'GEMINI_API_KEY belum dikonfigurasi di Vercel'
         }),
         { status: 500 }
       );
     }
 
     const response = await fetch(
-      'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent',
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
       {
         method: 'POST',
         headers: {
@@ -47,7 +45,6 @@ JANGAN tambahkan teks lain selain JSON.`
 
     const data = await response.json();
     
-    // Cek jika ada error dari Gemini
     if (data.error) {
       return new Response(
         JSON.stringify({ error: data.error.message || 'Terjadi kesalahan dari Gemini API' }),
@@ -55,7 +52,6 @@ JANGAN tambahkan teks lain selain JSON.`
       );
     }
 
-    // Extract text dari response Gemini
     const recipeText = data.candidates?.[0]?.content?.parts?.[0]?.text;
     
     if (!recipeText) {
@@ -65,10 +61,8 @@ JANGAN tambahkan teks lain selain JSON.`
       );
     }
 
-    // Parse JSON dari text (Gemini kadang return markdown)
     let parsedRecipe;
     try {
-      // Hapus markdown ```json dan ``` jika ada
       const cleanJSON = recipeText.replace(/```json\s*/, '').replace(/```\s*$/, '').trim();
       parsedRecipe = JSON.parse(cleanJSON);
     } catch (parseError) {
@@ -95,7 +89,6 @@ JANGAN tambahkan teks lain selain JSON.`
   }
 }
 
-// Handle GET (opsional, untuk health check)
 export async function GET() {
   return new Response(JSON.stringify({ status: 'ok' }), {
     headers: { 'Content-Type': 'application/json' }
