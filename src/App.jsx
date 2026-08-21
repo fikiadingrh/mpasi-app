@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 
 // ── CONSTANTS ────────────────────────────────────────────────────────────────
 const BAHAN_DB = {
-  "🥩 Protein Hewani": ["Ayam","Daging Sapi","Ikan Salmon","Ikan Kembung","Ikan Tuna","Udang","Telur","Hati Ayam","Hati Sapi","Ikan Teri"],
+  "🥩 Protein Hewani": ["Ayam","Dairy Sapi","Ikan Salmon","Ikan Kembung","Ikan Tuna","Udang","Telur","Hati Ayam","Hati Sapi","Ikan Teri"],
   "🌱 Protein Nabati": ["Tahu","Tempe","Kacang Merah","Kacang Hijau","Kacang Polong","Edamame"],
   "🌾 Karbohidrat": ["Beras","Oat","Kentang","Ubi Jalar","Labu Kuning","Singkong","Jagung","Pisang","Roti Tawar"],
   "🥦 Sayuran": ["Wortel","Brokoli","Bayam","Buncis","Kacang Panjang","Tomat","Labu Siam","Zucchini","Kembang Kol","Kangkung","Sawi","Jagung Manis","Timun"],
@@ -247,56 +247,33 @@ function Generator({ babyAge, alergi, savedRecipes, onSave, onAddJadwal }) {
   const generate=async()=>{
     if(!bahanDipilih.length) return;
     setLoading(true); setView("hasil"); setResults([]); setApiError("");
-    const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
-    if(!apiKey){
-      setApiError("API key Gemini belum diset. Lihat README untuk cara menambahkan VITE_GEMINI_API_KEY di Vercel (100% gratis!).");
-      setLoading(false); return;
-    }
-    const prompt=`Kamu adalah ahli nutrisi MPASI Indonesia. Buatkan TEPAT 4 resep MPASI kreatif dan bergizi untuk bayi usia ${babyAge} bulan.
 
-Bahan yang tersedia: ${bahanDipilih.join(", ")}
-${alergi.length?`⚠️ HINDARI bahan alergen ini: ${alergi.join(", ")}`:""}
+    try{
+      const res = await fetch('/api/gemini', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          ageMonths: babyAge,
+          dietaryRestrictions: alergi.length > 0 ? `Hindari alergen: ${alergi.join(', ')}` : ''
+        })
+      });
 
-ATURAN PENTING:
-- Tidak boleh ada garam, gula, madu, kecap, penyedap untuk bayi <1 tahun
-- Tekstur sesuai usia ${babyAge} bulan: ${parseInt(babyAge)<=6?"puree sangat halus":parseInt(babyAge)<=8?"puree agak kasar / bubur halus":"minced / cincang halus"}
-- Gunakan minimal 2 bahan dari daftar yang tersedia per resep
-- Resep harus praktis, bisa dibuat ibu rumah tangga biasa
-- Selalu ada komponen protein + karbohidrat dalam setiap resep
+      const data = await res.json();
 
-Balas HANYA dengan JSON array murni, tanpa teks lain, tanpa markdown, tanpa backtick:
-[{"nama":"Nama Resep","emoji":"emoji","warna":"#hexcolor","waktu":"X menit","tekstur":"jenis tekstur","nutrisi":"emoji + manfaat gizi singkat","bahan":["bahan 1 + takaran","bahan 2 + takaran"],"langkah":["langkah 1","langkah 2","langkah 3","langkah 4"],"tips":"1 tips spesifik resep ini"}]`;
-    
-    const generate=async()=>{
-  if(!bahanDipilih.length) return;
-  setLoading(true); setView("hasil"); setResults([]); setApiError("");
+      if(!res.ok || !data.success || !data.data){
+        setApiError(data.error || 'Gagal terhubung ke server');
+        setLoading(false);
+        return;
+      }
 
-  try{
-    const res = await fetch('/api/gemini', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ 
-        ageMonths: babyAge,
-        dietaryRestrictions: alergi.length > 0 ? `Hindari alergen: ${alergi.join(', ')}` : ''
-      })
-    });
-
-    const data = await res.json();
-
-    if(!res.ok || !data.success || !data.data){
-      setApiError(data.error || 'Gagal terhubung ke server');
+      setResults([data.data]);
+    }catch(e){
+      console.error('Generate error:', e);
+      setApiError("Gagal terhubung ke server. Coba lagi.");
+    }finally{
       setLoading(false);
-      return;
     }
-
-    setResults([data.data]);
-  }catch(e){
-    console.error('Generate error:', e);
-    setApiError("Gagal terhubung ke server. Coba lagi.");
-  }finally{
-    setLoading(false);
-  }
-};
+  };
 
   const handleAddJadwal=async(hari,waktu)=>{
     onAddJadwal(hari,waktu,activeResep.nama);
@@ -467,22 +444,6 @@ function Jadwal({jadwal,onAdd,savedRecipes}){
               <div className="slot-time">{w}</div>
               {menu?(
                 <div className="slot-filled"><span>{menu}</span><button className="btn-x" onClick={()=>onAdd(selHari,w,"")}>×</button></div>
-              ):picking===key?(
-                <div>
-                  {savedRecipes.length>0&&(
-                    <div style={{marginBottom:8}}>
-                      <div style={{fontSize:12,color:"#999",marginBottom:6}}>Dari tersimpan:</div>
-                      <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
-                        {savedRecipes.map(r=><button key={r.nama} className="chip active" style={{fontSize:12}} onClick={()=>handlePick(selHari,w,r.nama)}>{r.emoji} {r.nama}</button>)}
-                      </div>
-                    </div>
-                  )}
-                  <div className="custom-row">
-                    <input className="custom-inp" placeholder="Atau ketik nama menu..." value={inputNama} onChange={e=>setInputNama(e.target.value)} onKeyDown={e=>e.key==="Enter"&&inputNama.trim()&&handlePick(selHari,w,inputNama.trim())}/>
-                    <button className="btn-sm" onClick={()=>inputNama.trim()&&handlePick(selHari,w,inputNama.trim())}>✓</button>
-                  </div>
-                  <button className="btn-text" style={{marginTop:6}} onClick={()=>setPicking(null)}>Batal</button>
-                </div>
               ):(
                 <button className="slot-empty" onClick={()=>setPicking(key)}>+ Tambah menu</button>
               )}
